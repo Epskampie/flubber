@@ -4,6 +4,7 @@ import rotate from "./rotate.js";
 import { interpolatePoints } from "./math.js";
 
 export default function(fromShape, toShape, { maxSegmentLength = 10, string = true } = {}) {
+  console.log('interpolator hello hoi! 23');
   let fromRing = normalizeRing(fromShape, maxSegmentLength),
     toRing = normalizeRing(toShape, maxSegmentLength),
     interpolator = interpolateRing(fromRing, toRing, string);
@@ -14,10 +15,10 @@ export default function(fromShape, toShape, { maxSegmentLength = 10, string = tr
   }
 
   return t => {
-    if (t < 1e-4 && typeof fromShape === "string") {
+    if (t < 1e-4 && t > -1e-4 && typeof fromShape === "string") {
       return fromShape;
     }
-    if (1 - t < 1e-4 && typeof toShape === "string") {
+    if (1 - t < 1e-4 && 1 - t > -1e-4 && typeof toShape === "string") {
       return toShape;
     }
     return interpolator(t);

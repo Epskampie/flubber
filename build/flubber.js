@@ -1,7 +1,7 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.flubber = global.flubber || {})));
+	(factory((global.flubber = {})));
 }(this, (function (exports) { 'use strict';
 
 var polygonArea = function(polygon) {
@@ -45,29 +45,6 @@ var d3Centroid = function(polygon) {
 // the 3D cross product in a quadrant I Cartesian coordinate system (+x is
 // right, +y is up). Returns a positive value if ABC is counter-clockwise,
 // negative if clockwise, and zero if the points are collinear.
-var cross = function(a, b, c) {
-  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-};
-
-function lexicographicOrder(a, b) {
-  return a[0] - b[0] || a[1] - b[1];
-}
-
-// Computes the upper convex hull per the monotone chain algorithm.
-// Assumes points.length >= 3, is sorted by x, unique in y.
-// Returns an array of indices into points in left-to-right order.
-function computeUpperHullIndexes(points) {
-  var n = points.length,
-      indexes = [0, 1],
-      size = 2;
-
-  for (var i = 2; i < n; ++i) {
-    while (size > 1 && cross(points[indexes[size - 2]], points[indexes[size - 1]], points[i]) <= 0) { --size; }
-    indexes[size++] = i;
-  }
-
-  return indexes.slice(0, size); // remove popped points
-}
 
 var polygonLength = function(polygon) {
   var i = -1,
@@ -376,9 +353,6 @@ var path_parse = function pathParse(svgPath) {
   };
 };
 
-// combine 2 matrixes
-// m1, m2 - [a, b, c, d, e, g]
-//
 function combine(m1, m2) {
   return [
     m1[0] * m2[0] + m1[2] * m2[1],
@@ -787,10 +761,6 @@ var a2c = function a2c(x1, y1, x2, y2, fa, fs, rx, ry, phi) {
   });
 };
 
-/* eslint-disable space-infix-ops */
-
-// The precision used to consider an ellipse as a circle
-//
 var epsilon = 0.0000000001;
 
 // To convert degree in radians
@@ -888,8 +858,6 @@ Ellipse.prototype.isDegenerate = function () {
 
 var ellipse = Ellipse;
 
-// Class constructor
-//
 function SvgPath(path) {
   if (!(this instanceof SvgPath)) { return new SvgPath(path); }
 
@@ -1498,9 +1466,9 @@ SvgPath.prototype.unshort = function () {
 };
 
 
-var svgpath = SvgPath;
+var svgpath$1 = SvgPath;
 
-var index = svgpath;
+var svgpath = svgpath$1;
 
 //Parses an SVG path into an object.
 //Taken from https://github.com/jkroso/parse-svg-path
@@ -2155,13 +2123,16 @@ var svgPathProperties = function(svgString) {
     var cur = [0, 0];
     var prev_point = [0, 0];
     var curve;
+    var ringStart;
     for (var i = 0; i < parsed.length; i++){
       //moveTo
       if(parsed[i][0] === "M"){
         cur = [parsed[i][1], parsed[i][2]];
+        ringStart = [cur[0], cur[1]];
         functions.push(null);
       } else if(parsed[i][0] === "m"){
         cur = [parsed[i][1] + cur[0], parsed[i][2] + cur[1]];
+        ringStart = [cur[0], cur[1]];
         functions.push(null);
       }
       //lineTo
@@ -2191,9 +2162,9 @@ var svgPathProperties = function(svgString) {
         cur[1] = parsed[i][1] + cur[1];
       //Close path
       }  else if(parsed[i][0] === "z" || parsed[i][0] === "Z"){
-        length = length + Math.sqrt(Math.pow(parsed[0][1] - cur[0], 2) + Math.pow(parsed[0][2] - cur[1], 2));
-        functions.push(new LinearPosition(cur[0], parsed[0][1], cur[1], parsed[0][2]));
-        cur = [parsed[0][1], parsed[0][2]];
+        length = length + Math.sqrt(Math.pow(ringStart[0] - cur[0], 2) + Math.pow(ringStart[1] - cur[1], 2));
+        functions.push(new LinearPosition(cur[0], ringStart[0], cur[1], ringStart[1]));
+        cur = [ringStart[0], ringStart[1]];
       }
       //Cubic Bezier curves
       else if(parsed[i][0] === "C"){
@@ -2227,14 +2198,22 @@ var svgPathProperties = function(svgString) {
       }
       //Quadratic Bezier curves
       else if(parsed[i][0] === "Q"){
-        curve = new Bezier(cur[0], cur[1] , parsed[i][1], parsed[i][2] , parsed[i][3], parsed[i][4]);
+        if(cur[0] != parsed[i][1] && cur[1] != parsed[i][2]){
+          curve = new Bezier(cur[0], cur[1] , parsed[i][1], parsed[i][2] , parsed[i][3], parsed[i][4]);
+        } else {
+          curve = new LinearPosition(parsed[i][1], parsed[i][3], parsed[i][2], parsed[i][4]);
+        }
         length = length + curve.getTotalLength();
         functions.push(curve);
         cur = [parsed[i][3], parsed[i][4]];
         prev_point = [parsed[i][1], parsed[i][2]];
 
       }  else if(parsed[i][0] === "q"){
-        curve = new Bezier(cur[0], cur[1] , cur[0] + parsed[i][1], cur[1] + parsed[i][2] , cur[0] + parsed[i][3], cur[1] + parsed[i][4]);
+        if(!(parsed[i][1] == 0 && parsed[i][2] == 0)){
+          curve = new Bezier(cur[0], cur[1] , cur[0] + parsed[i][1], cur[1] + parsed[i][2] , cur[0] + parsed[i][3], cur[1] + parsed[i][4]);
+        } else {
+          curve = new LinearPosition(cur[0] + parsed[i][1], cur[0] + parsed[i][3], cur[1] + parsed[i][2], cur[1] + parsed[i][4]);
+        }
         length = length + curve.getTotalLength();
         prev_point = [cur[0] + parsed[i][1], cur[1] + parsed[i][2]];
         cur = [parsed[i][3] + cur[0], parsed[i][4] + cur[1]];
@@ -2378,8 +2357,8 @@ var INVALID_INPUT = "All shapes must be supplied as arrays of [x, y] points or a
 
 var INVALID_INPUT_ALL = "flubber.all() expects two arrays of equal length as arguments. Each element in both arrays should be an array of [x, y] points or an SVG path string (https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d).";
 
-function parse$$1(str) {
-  return new index(str).abs();
+function parse(str) {
+  return new svgpath(str).abs();
 }
 
 function split(parsed) {
@@ -2398,11 +2377,11 @@ function toPathString(ring) {
 }
 
 function splitPathString(str) {
-  return split(parse$$1(str));
+  return split(parse(str));
 }
 
 function pathStringToRing(str, maxSegmentLength) {
-  var parsed = parse$$1(str);
+  var parsed = parse(str);
 
   return exactRing(parsed) || approximateRing(parsed, maxSegmentLength);
 }
@@ -2605,6 +2584,7 @@ var interpolate = function(fromShape, toShape, ref) {
   var maxSegmentLength = ref.maxSegmentLength; if ( maxSegmentLength === void 0 ) maxSegmentLength = 10;
   var string = ref.string; if ( string === void 0 ) string = true;
 
+  console.log('interpolator hello hoi! 23');
   var fromRing = normalizeRing(fromShape, maxSegmentLength),
     toRing = normalizeRing(toShape, maxSegmentLength),
     interpolator = interpolateRing(fromRing, toRing, string);
@@ -2615,10 +2595,10 @@ var interpolate = function(fromShape, toShape, ref) {
   }
 
   return function (t) {
-    if (t < 1e-4 && typeof fromShape === "string") {
+    if (t < 1e-4 && t > -1e-4 && typeof fromShape === "string") {
       return fromShape;
     }
-    if (1 - t < 1e-4 && typeof toShape === "string") {
+    if (1 - t < 1e-4 && 1 - t > -1e-4 && typeof toShape === "string") {
       return toShape;
     }
     return interpolator(t);
@@ -2640,6 +2620,7 @@ function interpolateRing(fromRing, toRing, string) {
 }
 
 var earcut_1 = earcut;
+var default_1 = earcut;
 
 function earcut(data, holeIndices, dim) {
 
@@ -2652,7 +2633,7 @@ function earcut(data, holeIndices, dim) {
 
     if (!outerNode) { return triangles; }
 
-    var minX, minY, maxX, maxY, x, y, size;
+    var minX, minY, maxX, maxY, x, y, invSize;
 
     if (hasHoles) { outerNode = eliminateHoles(data, holeIndices, outerNode, dim); }
 
@@ -2670,11 +2651,12 @@ function earcut(data, holeIndices, dim) {
             if (y > maxY) { maxY = y; }
         }
 
-        // minX, minY and size are later used to transform coords into integers for z-order calculation
-        size = Math.max(maxX - minX, maxY - minY);
+        // minX, minY and invSize are later used to transform coords into integers for z-order calculation
+        invSize = Math.max(maxX - minX, maxY - minY);
+        invSize = invSize !== 0 ? 1 / invSize : 0;
     }
 
-    earcutLinked(outerNode, triangles, dim, minX, minY, size);
+    earcutLinked(outerNode, triangles, dim, minX, minY, invSize);
 
     return triangles;
 }
@@ -2710,7 +2692,7 @@ function filterPoints(start, end) {
         if (!p.steiner && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
             removeNode(p);
             p = end = p.prev;
-            if (p === p.next) { return null; }
+            if (p === p.next) { break; }
             again = true;
 
         } else {
@@ -2722,11 +2704,11 @@ function filterPoints(start, end) {
 }
 
 // main ear slicing loop which triangulates a polygon (given as a linked list)
-function earcutLinked(ear, triangles, dim, minX, minY, size, pass) {
+function earcutLinked(ear, triangles, dim, minX, minY, invSize, pass) {
     if (!ear) { return; }
 
     // interlink polygon nodes in z-order
-    if (!pass && size) { indexCurve(ear, minX, minY, size); }
+    if (!pass && invSize) { indexCurve(ear, minX, minY, invSize); }
 
     var stop = ear,
         prev, next;
@@ -2736,7 +2718,7 @@ function earcutLinked(ear, triangles, dim, minX, minY, size, pass) {
         prev = ear.prev;
         next = ear.next;
 
-        if (size ? isEarHashed(ear, minX, minY, size) : isEar(ear)) {
+        if (invSize ? isEarHashed(ear, minX, minY, invSize) : isEar(ear)) {
             // cut off the triangle
             triangles.push(prev.i / dim);
             triangles.push(ear.i / dim);
@@ -2757,16 +2739,16 @@ function earcutLinked(ear, triangles, dim, minX, minY, size, pass) {
         if (ear === stop) {
             // try filtering points and slicing again
             if (!pass) {
-                earcutLinked(filterPoints(ear), triangles, dim, minX, minY, size, 1);
+                earcutLinked(filterPoints(ear), triangles, dim, minX, minY, invSize, 1);
 
             // if this didn't work, try curing all small self-intersections locally
             } else if (pass === 1) {
                 ear = cureLocalIntersections(ear, triangles, dim);
-                earcutLinked(ear, triangles, dim, minX, minY, size, 2);
+                earcutLinked(ear, triangles, dim, minX, minY, invSize, 2);
 
             // as a last resort, try splitting the remaining polygon into two
             } else if (pass === 2) {
-                splitEarcut(ear, triangles, dim, minX, minY, size);
+                splitEarcut(ear, triangles, dim, minX, minY, invSize);
             }
 
             break;
@@ -2794,7 +2776,7 @@ function isEar(ear) {
     return true;
 }
 
-function isEarHashed(ear, minX, minY, size) {
+function isEarHashed(ear, minX, minY, invSize) {
     var a = ear.prev,
         b = ear,
         c = ear.next;
@@ -2808,8 +2790,8 @@ function isEarHashed(ear, minX, minY, size) {
         maxTY = a.y > b.y ? (a.y > c.y ? a.y : c.y) : (b.y > c.y ? b.y : c.y);
 
     // z-order range for the current triangle bbox;
-    var minZ = zOrder(minTX, minTY, minX, minY, size),
-        maxZ = zOrder(maxTX, maxTY, minX, minY, size);
+    var minZ = zOrder(minTX, minTY, minX, minY, invSize),
+        maxZ = zOrder(maxTX, maxTY, minX, minY, invSize);
 
     // first look for points inside the triangle in increasing z-order
     var p = ear.nextZ;
@@ -2860,7 +2842,7 @@ function cureLocalIntersections(start, triangles, dim) {
 }
 
 // try splitting polygon into two and triangulate them independently
-function splitEarcut(start, triangles, dim, minX, minY, size) {
+function splitEarcut(start, triangles, dim, minX, minY, invSize) {
     // look for a valid diagonal that divides the polygon into two
     var a = start;
     do {
@@ -2875,8 +2857,8 @@ function splitEarcut(start, triangles, dim, minX, minY, size) {
                 c = filterPoints(c, c.next);
 
                 // run earcut on each half
-                earcutLinked(a, triangles, dim, minX, minY, size);
-                earcutLinked(c, triangles, dim, minX, minY, size);
+                earcutLinked(a, triangles, dim, minX, minY, invSize);
+                earcutLinked(c, triangles, dim, minX, minY, invSize);
                 return;
             }
             b = b.next;
@@ -2933,7 +2915,7 @@ function findHoleBridge(hole, outerNode) {
     // find a segment intersected by a ray from the hole's leftmost point to the left;
     // segment's endpoint with lesser x will be potential connection point
     do {
-        if (hy <= p.y && hy >= p.next.y) {
+        if (hy <= p.y && hy >= p.next.y && p.next.y !== p.y) {
             var x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
             if (x <= hx && x > qx) {
                 qx = x;
@@ -2964,7 +2946,7 @@ function findHoleBridge(hole, outerNode) {
     p = m.next;
 
     while (p !== stop) {
-        if (hx >= p.x && p.x >= mx &&
+        if (hx >= p.x && p.x >= mx && hx !== p.x &&
                 pointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, p.x, p.y)) {
 
             tan = Math.abs(hy - p.y) / (hx - p.x); // tangential
@@ -2982,10 +2964,10 @@ function findHoleBridge(hole, outerNode) {
 }
 
 // interlink polygon nodes in z-order
-function indexCurve(start, minX, minY, size) {
+function indexCurve(start, minX, minY, invSize) {
     var p = start;
     do {
-        if (p.z === null) { p.z = zOrder(p.x, p.y, minX, minY, size); }
+        if (p.z === null) { p.z = zOrder(p.x, p.y, minX, minY, invSize); }
         p.prevZ = p.prev;
         p.nextZ = p.next;
         p = p.next;
@@ -3018,20 +3000,11 @@ function sortLinked(list) {
                 q = q.nextZ;
                 if (!q) { break; }
             }
-
             qSize = inSize;
 
             while (pSize > 0 || (qSize > 0 && q)) {
 
-                if (pSize === 0) {
-                    e = q;
-                    q = q.nextZ;
-                    qSize--;
-                } else if (qSize === 0 || !q) {
-                    e = p;
-                    p = p.nextZ;
-                    pSize--;
-                } else if (p.z <= q.z) {
+                if (pSize !== 0 && (qSize === 0 || !q || p.z <= q.z)) {
                     e = p;
                     p = p.nextZ;
                     pSize--;
@@ -3059,11 +3032,11 @@ function sortLinked(list) {
     return list;
 }
 
-// z-order of a point given coords and size of the data bounding box
-function zOrder(x, y, minX, minY, size) {
+// z-order of a point given coords and inverse of the longer side of data bbox
+function zOrder(x, y, minX, minY, invSize) {
     // coords are transformed into non-negative 15-bit integer range
-    x = 32767 * (x - minX) / size;
-    y = 32767 * (y - minY) / size;
+    x = 32767 * (x - minX) * invSize;
+    y = 32767 * (y - minY) * invSize;
 
     x = (x | (x << 8)) & 0x00FF00FF;
     x = (x | (x << 4)) & 0x0F0F0F0F;
@@ -3147,7 +3120,8 @@ function middleInside(a, b) {
         px = (a.x + b.x) / 2,
         py = (a.y + b.y) / 2;
     do {
-        if (((p.y > py) !== (p.next.y > py)) && (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x))
+        if (((p.y > py) !== (p.next.y > py)) && p.next.y !== p.y &&
+                (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x))
             { inside = !inside; }
         p = p.next;
     } while (p !== a);
@@ -3281,6 +3255,8 @@ earcut.flatten = function (data) {
     }
     return result;
 };
+
+earcut_1.default = default_1;
 
 var identity = function(x) {
   return x;
@@ -3636,152 +3612,7 @@ function ascendingComparator(f) {
 }
 
 var ascendingBisect = bisector(ascending);
-var bisectRight = ascendingBisect.right;
 
-function pair(a, b) {
-  return [a, b];
-}
-
-var number$1 = function(x) {
-  return x === null ? NaN : +x;
-};
-
-var extent = function(values, valueof) {
-  var n = values.length,
-      i = -1,
-      value,
-      min,
-      max;
-
-  if (valueof == null) {
-    while (++i < n) { // Find the first comparable value.
-      if ((value = values[i]) != null && value >= value) {
-        min = max = value;
-        while (++i < n) { // Compare the remaining values.
-          if ((value = values[i]) != null) {
-            if (min > value) { min = value; }
-            if (max < value) { max = value; }
-          }
-        }
-      }
-    }
-  }
-
-  else {
-    while (++i < n) { // Find the first comparable value.
-      if ((value = valueof(values[i], i, values)) != null && value >= value) {
-        min = max = value;
-        while (++i < n) { // Compare the remaining values.
-          if ((value = valueof(values[i], i, values)) != null) {
-            if (min > value) { min = value; }
-            if (max < value) { max = value; }
-          }
-        }
-      }
-    }
-  }
-
-  return [min, max];
-};
-
-var identity$1 = function(x) {
-  return x;
-};
-
-var range = function(start, stop, step) {
-  start = +start, stop = +stop, step = (n = arguments.length) < 2 ? (stop = start, start = 0, 1) : n < 3 ? 1 : +step;
-
-  var i = -1,
-      n = Math.max(0, Math.ceil((stop - start) / step)) | 0,
-      range = new Array(n);
-
-  while (++i < n) {
-    range[i] = start + i * step;
-  }
-
-  return range;
-};
-
-var e10 = Math.sqrt(50);
-var e5 = Math.sqrt(10);
-var e2 = Math.sqrt(2);
-
-function tickIncrement(start, stop, count) {
-  var step = (stop - start) / Math.max(0, count),
-      power = Math.floor(Math.log(step) / Math.LN10),
-      error = step / Math.pow(10, power);
-  return power >= 0
-      ? (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1) * Math.pow(10, power)
-      : -Math.pow(10, -power) / (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1);
-}
-
-function tickStep(start, stop, count) {
-  var step0 = Math.abs(stop - start) / Math.max(0, count),
-      step1 = Math.pow(10, Math.floor(Math.log(step0) / Math.LN10)),
-      error = step0 / step1;
-  if (error >= e10) { step1 *= 10; }
-  else if (error >= e5) { step1 *= 5; }
-  else if (error >= e2) { step1 *= 2; }
-  return stop < start ? -step1 : step1;
-}
-
-var sturges = function(values) {
-  return Math.ceil(Math.log(values.length) / Math.LN2) + 1;
-};
-
-var quantile = function(values, p, valueof) {
-  if (valueof == null) { valueof = number$1; }
-  if (!(n = values.length)) { return; }
-  if ((p = +p) <= 0 || n < 2) { return +valueof(values[0], 0, values); }
-  if (p >= 1) { return +valueof(values[n - 1], n - 1, values); }
-  var n,
-      i = (n - 1) * p,
-      i0 = Math.floor(i),
-      value0 = +valueof(values[i0], i0, values),
-      value1 = +valueof(values[i0 + 1], i0 + 1, values);
-  return value0 + (value1 - value0) * (i - i0);
-};
-
-var min = function(values, valueof) {
-  var n = values.length,
-      i = -1,
-      value,
-      min;
-
-  if (valueof == null) {
-    while (++i < n) { // Find the first comparable value.
-      if ((value = values[i]) != null && value >= value) {
-        min = value;
-        while (++i < n) { // Compare the remaining values.
-          if ((value = values[i]) != null && min > value) {
-            min = value;
-          }
-        }
-      }
-    }
-  }
-
-  else {
-    while (++i < n) { // Find the first comparable value.
-      if ((value = valueof(values[i], i, values)) != null && value >= value) {
-        min = value;
-        while (++i < n) { // Compare the remaining values.
-          if ((value = valueof(values[i], i, values)) != null && min > value) {
-            min = value;
-          }
-        }
-      }
-    }
-  }
-
-  return min;
-};
-
-function length$1(d) {
-  return d.length;
-}
-
-// TODO use TopoJSON native instead?
 function createTopology(triangles, ring) {
   var arcIndices = {},
     topology = {
@@ -3834,7 +3665,7 @@ function createTopology(triangles, ring) {
 
 function collapseTopology(topology, numPieces) {
   var geometries = topology.objects.triangles.geometries,
-    bisect$$1 = bisector(function (d) { return d.area; }).left;
+    bisect = bisector(function (d) { return d.area; }).left;
 
   while (geometries.length > numPieces) {
     mergeSmallestFeature();
@@ -3865,7 +3696,7 @@ function collapseTopology(topology, numPieces) {
     geometries.shift();
 
     // Add new merged shape in sorted order
-    geometries.splice(bisect$$1(geometries, merged.area), 0, merged);
+    geometries.splice(bisect(geometries, merged.area), 0, merged);
   }
 }
 
@@ -3885,15 +3716,11 @@ function cut(ring) {
   return triangles;
 }
 
-// With 8 or fewer shapes, find the best permutation
-// Skip if array is huge (9+ shapes)
 var pieceOrder = function(start, end) {
-  var distances = start.map(function (p1) { return end.map(function (p2) { return squaredDistance(p1, p2); }); }),
-    order = bestOrder(start, end, distances);
-
   if (start.length > 8) {
     return start.map(function (d, i) { return i; });
   }
+  var distances = start.map(function (p1) { return end.map(function (p2) { return squaredDistance(p1, p2); }); });
   return bestOrder(start, end, distances);
 };
 
